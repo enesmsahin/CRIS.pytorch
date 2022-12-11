@@ -37,12 +37,12 @@ def get_parser():
     cfg = config.load_cfg_from_cfg_file(args.config)
     if args.opts is not None:
         cfg = config.merge_cfg_from_list(cfg, args.opts)
-    return cfg
+    return cfg, args
 
 
 @logger.catch
 def main():
-    args = get_parser()
+    args, args_2 = get_parser()
     args.output_dir = os.path.join(args.output_folder, args.exp_name)
 
     # logger
@@ -54,22 +54,24 @@ def main():
 
     # build model
     model, _ = build_segmenter(args)
+    model = torch.nn.DataParallel(model).cuda()
     logger.info(model)
 
-    if os.path.isfile(args.model):
-        logger.info("=> loading checkpoint '{}'".format(args.model))
-        checkpoint = torch.load(args.model)
+    logger.info(args)
+    if os.path.isfile(args_2.model):
+        logger.info("=> loading checkpoint '{}'".format(args_2.model))
+        checkpoint = torch.load(args_2.model)
         model.load_state_dict(checkpoint['state_dict'], strict=True)
-        logger.info("=> loaded checkpoint '{}'".format(args.model))
+        logger.info("=> loaded checkpoint '{}'".format(args_2.model))
     else:
         raise ValueError(
             "=> resume failed! no checkpoint found at '{}'. Please check args.resume again!"
-            .format(args.model))
+            .format(args_2.model))
 
     # inference
-    pred = inference_single(args.img, args.text, model, args)
+    pred = inference_single(args_2.img, args_2.text, model, args)
 
-    save_path = str(Path(args.output_dir) / (Path(args.img).stem + ".png"))
+    save_path = str(Path(args.output_dir) / (Path(args_2.img).stem + ".png"))
     cv2.imwrite(save_path, pred, [cv2.IMWRITE_PNG_COMPRESSION, 0]) 
     logger.info(f"Output image is saved to {save_path}")
 

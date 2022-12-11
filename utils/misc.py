@@ -31,7 +31,7 @@ def convert(img, mask=None):
 
 def getTransformMat(img_size, input_size, inverse=False):
     ori_h, ori_w = img_size
-    inp_h, inp_w = input_size
+    inp_h, inp_w = input_size,input_size
     scale = min(inp_h / ori_h, inp_w / ori_w)
     new_h, new_w = ori_h * scale, ori_w * scale
     bias_x, bias_y = (inp_w - new_w) / 2., (inp_h - new_h) / 2.

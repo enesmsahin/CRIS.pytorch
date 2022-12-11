@@ -228,11 +228,11 @@ def inference_single(im_path, sent, model, args):
     img = cv2.warpAffine(
             img,
             mat,
-            args.input_size,
+            (args.input_size,args.input_size),
             flags=cv2.INTER_CUBIC,
             borderValue=[0.48145466 * 255, 0.4578275 * 255, 0.40821073 * 255])
 
-    img = convert(img)[0] # img: torch.Tensor
+    img = convert(img)[0].unsqueeze(0) # img: torch.Tensor
     param = {
         'inverse': mat_inv,
         'ori_size': np.array(img_size),
