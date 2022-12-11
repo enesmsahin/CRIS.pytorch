@@ -6,10 +6,45 @@ from loguru import logger
 import sys
 import inspect
 
+import cv2
 import torch
 from torch import nn
 import torch.distributed as dist
 
+def convert(img, mask=None):
+    mean = torch.tensor([0.48145466, 0.4578275,
+                                  0.40821073]).reshape(3, 1, 1)
+
+    std = torch.tensor([0.26862954, 0.26130258,
+                                 0.27577711]).reshape(3, 1, 1)
+    # Image ToTensor & Normalize
+    img = torch.from_numpy(img.transpose((2, 0, 1)))
+    if not isinstance(img, torch.FloatTensor):
+        img = img.float()
+    img.div_(255.).sub_(mean).div_(std)
+    # Mask ToTensor
+    if mask is not None:
+        mask = torch.from_numpy(mask)
+        if not isinstance(mask, torch.FloatTensor):
+            mask = mask.float()
+    return img, mask
+
+def getTransformMat(img_size, input_size, inverse=False):
+    ori_h, ori_w = img_size
+    inp_h, inp_w = input_size
+    scale = min(inp_h / ori_h, inp_w / ori_w)
+    new_h, new_w = ori_h * scale, ori_w * scale
+    bias_x, bias_y = (inp_w - new_w) / 2., (inp_h - new_h) / 2.
+
+    src = np.array([[0, 0], [ori_w, 0], [0, ori_h]], np.float32)
+    dst = np.array([[bias_x, bias_y], [new_w + bias_x, bias_y],
+                    [bias_x, new_h + bias_y]], np.float32)
+
+    mat = cv2.getAffineTransform(src, dst)
+    if inverse:
+        mat_inv = cv2.getAffineTransform(dst, src)
+        return mat, mat_inv
+    return mat, None
 
 def init_random_seed(seed=None, device='cuda', rank=0, world_size=1):
     """Initialize random seed."""

@@ -11,7 +11,7 @@ import wandb
 from loguru import logger
 from utils.dataset import tokenize
 from utils.misc import (AverageMeter, ProgressMeter, concat_all_gather,
-                        trainMetricGPU)
+                        trainMetricGPU, getTransformMat, convert)
 
 
 def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
@@ -213,3 +213,52 @@ def inference(test_loader, model, args):
         logger.info('{}: {:.2f}.'.format(k, 100.*v))
 
     return iou.item(), prec
+
+@torch.no_grad()
+def inference_single(im_path, sent, model, args):
+    model.eval()
+    time.sleep(2)
+
+    img = cv2.imread(im_path, cv2.IMREAD_COLOR)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    img_size = img.shape[:2]
+    mat, mat_inv = getTransformMat(img_size, args.input_size, True)
+
+    img = cv2.warpAffine(
+            img,
+            mat,
+            args.input_size,
+            flags=cv2.INTER_CUBIC,
+            borderValue=[0.48145466 * 255, 0.4578275 * 255, 0.40821073 * 255])
+
+    img = convert(img)[0] # img: torch.Tensor
+    param = {
+        'inverse': mat_inv,
+        'ori_size': np.array(img_size),
+    }
+
+    img = img.cuda(non_blocking=True)
+    text = tokenize(sent, args.word_len, True)
+    text = text.cuda(non_blocking=True)
+    # inference
+    pred = model(img, text)
+    pred = torch.sigmoid(pred)
+    if pred.shape[-2:] != img.shape[-2:]:
+        pred = F.interpolate(pred,
+                                size=img.shape[-2:],
+                                mode='bicubic',
+                                align_corners=True).squeeze()
+    
+    # process one sentence
+    h, w = param['ori_size'].numpy()[0]
+    mat = param['inverse'].numpy()[0]
+    pred = pred.cpu().numpy()
+    pred = cv2.warpAffine(pred, mat, (w, h),
+                            flags=cv2.INTER_CUBIC,
+                            borderValue=0.)
+    pred = np.array(pred > 0.35)
+
+    pred_img = np.array(pred*255, dtype=np.uint8)
+
+    return pred_img
