@@ -23,6 +23,7 @@ def get_parser():
     
     parser.add_argument("--img", type=str, required=True, help="Path to input image")
     parser.add_argument("--text", type=str, required=True, help="Text input")
+    parser.add_argument("--model", type=str, required=True, help="Path to trained model pth")
     parser.add_argument('--config',
                         default='path to xxx.yaml',
                         type=str,
@@ -55,16 +56,15 @@ def main():
     model, _ = build_segmenter(args)
     logger.info(model)
 
-    args.model_dir = os.path.join(args.output_dir, "best_model.pth")
-    if os.path.isfile(args.model_dir):
-        logger.info("=> loading checkpoint '{}'".format(args.model_dir))
-        checkpoint = torch.load(args.model_dir)
+    if os.path.isfile(args.model):
+        logger.info("=> loading checkpoint '{}'".format(args.model))
+        checkpoint = torch.load(args.model)
         model.load_state_dict(checkpoint['state_dict'], strict=True)
-        logger.info("=> loaded checkpoint '{}'".format(args.model_dir))
+        logger.info("=> loaded checkpoint '{}'".format(args.model))
     else:
         raise ValueError(
             "=> resume failed! no checkpoint found at '{}'. Please check args.resume again!"
-            .format(args.model_dir))
+            .format(args.model))
 
     # inference
     pred = inference_single(args.img, args.text, model, args)
